@@ -10,7 +10,7 @@ full-stack completo, esta vez integrando una API externa real.
 
 ## Screenshots
 
-_(agrega aquí 1-2 capturas de la app corriendo)_
+![Pantalla de inicio](home.png)
 
 ## Cómo funciona
 
