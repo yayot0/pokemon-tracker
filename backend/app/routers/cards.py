@@ -22,23 +22,23 @@ def search(q: str):
     los resultados nuevos en caché para la próxima vez.
     """
     conn = queries.get_connection()
-    cached = queries.search_cached_cards(conn, q)
-
-    if cached:
-        conn.close()
-        return [CardSearchResult(**dict(row)) for row in cached]
-
     try:
-        results = pokemon_api.search_cards(q)
-    except PokemonAPIError as exc:
+        cached = queries.search_cached_cards(conn, q)
+
+        if cached:
+            return [CardSearchResult(**dict(row)) for row in cached]
+
+        try:
+            results = pokemon_api.search_cards(q)
+        except PokemonAPIError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+        for card in results:
+            queries.upsert_card(conn, card)
+
+        return results
+    finally:
         conn.close()
-        raise HTTPException(status_code=503, detail=str(exc))
-
-    for card in results:
-        queries.upsert_card(conn, card)
-    conn.close()
-
-    return results
 
 
 @router.get("/{card_id}", response_model=CardDetail)
@@ -60,11 +60,13 @@ def get_card_detail(card_id: str):
     tcgplayer_market, cardmarket_avg = pokemon_api.extract_prices(card_json)
 
     conn = queries.get_connection()
-    queries.upsert_card(conn, simplified)
-    queries.insert_price_snapshot(
-        conn, card_id, date.today().isoformat(), tcgplayer_market, cardmarket_avg
-    )
-    conn.close()
+    try:
+        queries.upsert_card(conn, simplified)
+        queries.insert_price_snapshot(
+            conn, card_id, date.today().isoformat(), tcgplayer_market, cardmarket_avg
+        )
+    finally:
+        conn.close()
 
     return CardDetail(
         id=simplified["id"],
@@ -81,6 +83,8 @@ def get_card_detail(card_id: str):
 def get_history(card_id: str):
     """Historial completo de precios guardados para esta carta."""
     conn = queries.get_connection()
-    rows = queries.get_price_history(conn, card_id)
-    conn.close()
+    try:
+        rows = queries.get_price_history(conn, card_id)
+    finally:
+        conn.close()
     return [PriceSnapshotOut(**dict(row)) for row in rows]

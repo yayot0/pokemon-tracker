@@ -17,8 +17,10 @@ router = APIRouter(tags=["browse"])
 def recent_cards():
     """Últimas cartas que consultaste, para 'tus últimas vistas'."""
     conn = queries.get_connection()
-    rows = queries.get_recently_viewed(conn)
-    conn.close()
+    try:
+        rows = queries.get_recently_viewed(conn)
+    finally:
+        conn.close()
     return [CardSearchResult(**dict(row)) for row in rows]
 
 
@@ -29,23 +31,23 @@ def list_sets():
     si ya los consultamos antes, regresa del caché local (instantáneo).
     """
     conn = queries.get_connection()
-    cached = queries.get_cached_sets(conn)
-
-    if cached:
-        conn.close()
-        return [SetOut(**dict(row)) for row in cached]
-
     try:
-        sets_data = pokemon_api.get_sets()
-    except PokemonAPIError as exc:
+        cached = queries.get_cached_sets(conn)
+
+        if cached:
+            return [SetOut(**dict(row)) for row in cached]
+
+        try:
+            sets_data = pokemon_api.get_sets()
+        except PokemonAPIError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
+        for s in sets_data:
+            queries.upsert_set(conn, s)
+
+        return sets_data
+    finally:
         conn.close()
-        raise HTTPException(status_code=503, detail=str(exc))
-
-    for s in sets_data:
-        queries.upsert_set(conn, s)
-    conn.close()
-
-    return sets_data
 
 
 @router.get("/sets/{set_id}/cards", response_model=list[CardSearchResult])
@@ -57,8 +59,10 @@ def cards_in_set(set_id: str):
         raise HTTPException(status_code=503, detail=str(exc))
 
     conn = queries.get_connection()
-    for card in results:
-        queries.upsert_card(conn, card)
-    conn.close()
+    try:
+        for card in results:
+            queries.upsert_card(conn, card)
+    finally:
+        conn.close()
 
     return results

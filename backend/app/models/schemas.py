@@ -2,7 +2,14 @@
 schemas.py
 Modelos Pydantic: definen cómo se ve cada request/response de la API.
 """
+from typing import Literal
+
 from pydantic import BaseModel
+
+CardCondition = Literal[
+    "Mint", "Near Mint", "Lightly Played",
+    "Moderately Played", "Heavily Played", "Damaged",
+]
 
 
 class SetOut(BaseModel):
@@ -43,7 +50,7 @@ class CardDetail(BaseModel):
 class CollectionItemIn(BaseModel):
     card_id: str
     quantity: int = 1
-    condition: str = "Near Mint"
+    condition: CardCondition = "Near Mint"
     acquired_date: str | None = None
     acquired_price: float | None = None
     notes: str | None = None
@@ -51,7 +58,7 @@ class CollectionItemIn(BaseModel):
 
 class CollectionItemUpdate(BaseModel):
     quantity: int
-    condition: str
+    condition: CardCondition
 
 
 class CollectionItemOut(BaseModel):
