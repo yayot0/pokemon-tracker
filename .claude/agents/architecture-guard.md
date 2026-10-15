@@ -1,6 +1,6 @@
 ---
 name: architecture-guard
-description: Revisa que los cambios en pokemon-tracker respeten la arquitectura del proyecto (SQL solo en queries.py, API externa solo en pokemon_api.py, fetch solo en client.js, flujo cache-first, conexiones SQLite bien cerradas, tokens de Tailwind). Úsalo después de modificar archivos del backend o del frontend y antes de hacer commit. Solo lee y reporta; nunca modifica archivos.
+description: Úsalo PROACTIVAMENTE cada vez que el usuario pida revisar sus cambios, revisar antes de commit o revisar el código de pokemon-tracker. Verifica que se respete la arquitectura del proyecto (SQL solo en queries.py, API externa solo en pokemon_api.py, fetch solo en client.js, flujo cache-first, conexiones SQLite bien cerradas, tokens de Tailwind). Solo lee y reporta; nunca modifica archivos.
 tools: Read, Grep, Glob
 model: sonnet
 ---

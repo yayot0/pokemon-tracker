@@ -18,8 +18,8 @@ pip install -r requirements.txt --break-system-packages
 # create/reset the SQLite database (reads schema.sql, must be run before first use)
 python3 -c "import sqlite3; c = sqlite3.connect('data/pokemon.db'); c.executescript(open('app/db/schema.sql').read()); c.close()"
 
-# run the API (must be run from backend/, not app/ or data/ — DB_PATH and
-# module imports are resolved relative to this cwd)
+# run the API (must be run from backend/, not app/ or data/ — the
+# `app.main:app` import string needs `app/` importable from cwd)
 python3 -m uvicorn app.main:app --reload
 ```
 API at `http://127.0.0.1:8000`, interactive docs at `/docs`. No test suite exists in this repo.
@@ -44,7 +44,7 @@ in one place: `backend/app/db/queries.py`. Routers call into `queries.py` and
 
 - `app/main.py` — app setup, CORS, router registration.
 - `app/db/schema.sql` — table definitions, applied manually via the command above (no migration tool).
-- `app/db/queries.py` — every query in the project, grouped by table. Each endpoint opens a connection via `get_connection()` and closes it itself (no shared session/dependency injection).
+- `app/db/queries.py` — every query in the project, grouped by table. Each endpoint opens a connection via `get_connection()` and closes it itself in a `try/finally` so it's released even on exceptions (no shared session/dependency injection).
 - `app/services/pokemon_api.py` — the only module that talks to the external pokemontcg.io API. Retries each request up to 3x with a 1.5s backoff before raising `PokemonAPIError`, since the free/unauthenticated tier is intermittently flaky rather than reliably down. Also owns `_simplify_card`/`_simplify_set` (external JSON → internal dict shape) and `extract_prices` (pulls a representative TCGPlayer `market` price and the Cardmarket average out of the API's nested price-by-finish structure).
 - `app/routers/` — `cards.py` (search/detail/history), `collection.py`, `browse.py` (home screen: recently viewed + sets).
 - `app/models/schemas.py` — Pydantic response models.
@@ -68,3 +68,9 @@ external data.
 - `src/components/` — `Home.jsx` (landing view), `SearchBar.jsx`, `CardGrid.jsx`/`CardGridSkeleton.jsx`, `CardDetailPanel.jsx`, `CollectionList.jsx`.
 - Visual identity is a dark "card binder" theme — custom Tailwind tokens (`ink`, `surface`, `gold`, `gain`/`loss`, etc.) are defined in `tailwind.config.js`; reuse those tokens rather than introducing new colors.
 - Backend base URL is hardcoded in `client.js` as `http://127.0.0.1:8000` (no env-based config).
+
+## Subagentes
+
+- Cuando pida revisar mis cambios o revisar antes de commit, delega siempre al
+  subagente `architecture-guard` (`.claude/agents/architecture-guard.md`). Si
+  además usas la skill `code-review`, úsala como complemento, no como reemplazo.
