@@ -4,6 +4,8 @@ Tests del router app/routers/browse.py: pantalla de inicio (cartas vistas
 recientemente), listado de sets (cache-first, igual que la búsqueda de
 cartas) y cartas dentro de un set.
 """
+import pytest
+
 from app.db import queries
 from app.services import pokemon_api
 from app.services.pokemon_api import PokemonAPIError
@@ -197,3 +199,106 @@ def test_cartas_de_un_set_con_error_de_api_responde_503(client, monkeypatch):
 
     assert response.status_code == 503
     assert "no respondió" in response.json()["detail"]
+
+
+def test_cartas_de_un_set_cache_miss_registra_en_set_cards_cache(client, monkeypatch):
+    """Tras un cache-miss, cada carta devuelta por la API externa debe
+    quedar registrada en `set_cards_cache` para ese set."""
+
+    def fake_search_cards_in_set(set_id, *args, **kwargs):
+        return [_carta_simplificada("jungle-1", "Clefable")]
+
+    monkeypatch.setattr(pokemon_api, "search_cards_in_set", fake_search_cards_in_set)
+
+    response = client.get("/sets/jungle/cards")
+    assert response.status_code == 200
+
+    conn = queries.get_connection()
+    try:
+        fila = conn.execute(
+            "SELECT set_id, card_id FROM set_cards_cache WHERE set_id = ? AND card_id = ?",
+            ("jungle", "jungle-1"),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert fila is not None
+    assert fila["set_id"] == "jungle"
+    assert fila["card_id"] == "jungle-1"
+
+
+def test_cartas_de_un_set_segunda_llamada_no_pega_a_la_api(client, monkeypatch):
+    """Regla cache-first: tras un primer cache-miss que llena `set_cards_cache`,
+    una segunda consulta al mismo set no debe volver a llamar a
+    `pokemon_api.search_cards_in_set`."""
+
+    def fake_search_cards_in_set(set_id, *args, **kwargs):
+        return [_carta_simplificada("fossil-2", "Articuno")]
+
+    monkeypatch.setattr(pokemon_api, "search_cards_in_set", fake_search_cards_in_set)
+
+    primera = client.get("/sets/fossil/cards")
+    assert primera.status_code == 200
+    primer_body = primera.json()
+
+    def fake_search_cards_in_set_que_no_debe_llamarse(set_id, *args, **kwargs):
+        pytest.fail("search_cards_in_set no debe llamarse en un cache-hit")
+
+    monkeypatch.setattr(
+        pokemon_api, "search_cards_in_set", fake_search_cards_in_set_que_no_debe_llamarse
+    )
+
+    segunda = client.get("/sets/fossil/cards")
+
+    assert segunda.status_code == 200
+    assert segunda.json() == primer_body
+
+
+def test_cartas_de_un_set_no_mezcla_cartas_cacheadas_por_otra_via(client, monkeypatch):
+    """Una carta que ya está en `cards` con el mismo set_id, pero que llegó
+    ahí vía /cards/search (no está en `set_cards_cache` para este set), no
+    debe aparecer en la respuesta de este endpoint."""
+    conn = queries.get_connection()
+    try:
+        queries.upsert_card(
+            conn,
+            {
+                "id": "gym1-50",
+                "name": "Carta de búsqueda previa",
+                "set_id": "gym1",
+                "set_name": "Gym Heroes",
+                "number": "50",
+                "rarity": "Common",
+                "image_url": "https://example.com/gym1-50.png",
+            },
+        )
+    finally:
+        conn.close()
+
+    def fake_search_cards_in_set(set_id, *args, **kwargs):
+        return [_carta_simplificada("gym1-1", "Misty's Wartortle")]
+
+    monkeypatch.setattr(pokemon_api, "search_cards_in_set", fake_search_cards_in_set)
+
+    response = client.get("/sets/gym1/cards")
+
+    assert response.status_code == 200
+    body = response.json()
+    ids = {item["id"] for item in body}
+    assert ids == {"gym1-1"}
+    assert "gym1-50" not in ids
+
+    def fake_search_cards_in_set_que_no_debe_llamarse(set_id, *args, **kwargs):
+        pytest.fail("search_cards_in_set no debe llamarse en un cache-hit")
+
+    monkeypatch.setattr(
+        pokemon_api, "search_cards_in_set", fake_search_cards_in_set_que_no_debe_llamarse
+    )
+
+    segunda = client.get("/sets/gym1/cards")
+
+    assert segunda.status_code == 200
+    segundo_body = segunda.json()
+    segundos_ids = {item["id"] for item in segundo_body}
+    assert segundos_ids == {"gym1-1"}
+    assert "gym1-50" not in segundos_ids

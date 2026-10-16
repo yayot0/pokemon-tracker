@@ -63,6 +63,7 @@ in one place: `backend/app/db/queries.py`. Routers call into `queries.py` and
 - `price_snapshots` has `UNIQUE(card_id, date)`; every `GET /cards/{id}` fetch does `INSERT OR REPLACE`, so re-querying the same card on the same day updates that day's snapshot instead of duplicating it. The external API only ever returns the *current* price — this table is how price history is built, one snapshot at a time, purely from app usage over multiple days.
 - `collection` (the cards the user actually owns) is intentionally separate from `cards` (the search cache) — a card can be cached from a search without being owned, and a card can be owned in multiple quantities/conditions.
 - `sets_cache` mirrors the `cards` caching pattern for set/expansion data.
+- `set_cards_cache` records which cards the API returned for each set (`set_id`, `card_id`), so `GET /sets/{set_id}/cards` can serve exactly those cards from `cards` on a cache hit. Cards that reached `cards` via search are not mixed in, and responses always read back through the cache so order is consistent between miss and hit.
 
 **Cache-first request flow**: endpoints that hit the external API (search,
 sets) check the local SQLite cache first and only call `pokemon_api.py` on a
@@ -83,3 +84,8 @@ external data.
 - Cuando pida revisar mis cambios o revisar antes de commit, delega siempre al
   subagente `architecture-guard` (`.claude/agents/architecture-guard.md`). Si
   además usas la skill `code-review`, úsala como complemento, no como reemplazo.
+- Para construir o modificar funcionalidad del backend, delega al subagente
+  `endpoint-builder`. Cuando termine, delega a `test-writer` los tests de lo
+  nuevo y después a `architecture-guard` la revisión. Ningún subagente
+  modifica el trabajo del otro: el builder no toca tests y test-writer no
+  toca la app.

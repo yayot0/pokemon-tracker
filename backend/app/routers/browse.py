@@ -52,17 +52,26 @@ def list_sets():
 
 @router.get("/sets/{set_id}/cards", response_model=list[CardSearchResult])
 def cards_in_set(set_id: str):
-    """Cartas de un set específico, para cuando le das clic a un set."""
-    try:
-        results = pokemon_api.search_cards_in_set(set_id)
-    except PokemonAPIError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-
+    """
+    Cartas de un set específico. Cache-first: si ya guardamos qué
+    cartas devolvió la API para este set, se sirven desde 'cards'
+    sin pegarle a la API externa.
+    """
     conn = queries.get_connection()
     try:
+        cached = queries.get_cached_set_cards(conn, set_id)
+        if cached:
+            return [CardSearchResult(**dict(row)) for row in cached]
+
+        try:
+            results = pokemon_api.search_cards_in_set(set_id)
+        except PokemonAPIError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+
         for card in results:
             queries.upsert_card(conn, card)
+            queries.mark_set_card_cached(conn, set_id, card["id"])
+
+        return [CardSearchResult(**dict(row)) for row in queries.get_cached_set_cards(conn, set_id)]
     finally:
         conn.close()
-
-    return results

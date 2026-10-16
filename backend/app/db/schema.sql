@@ -85,3 +85,20 @@ CREATE TABLE IF NOT EXISTS sets_cache (
     symbol_url      TEXT,
     cached_at       TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ------------------------------------------------------------
+-- set_cards_cache
+-- Registra qué cartas devolvió la API externa para cada set,
+-- para que GET /sets/{set_id}/cards pueda servir desde 'cards'
+-- sin volver a pegarle a la API. Se guarda carta por carta (no solo
+-- "este set ya se consultó") porque no se puede asumir que el orden
+-- resultante de reordenar 'cards' por número coincide exactamente
+-- con lo que la API devolvió para ese set.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS set_cards_cache (
+    set_id      TEXT NOT NULL,
+    card_id     TEXT NOT NULL,
+    fetched_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (set_id, card_id),
+    FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+);

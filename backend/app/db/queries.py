@@ -83,6 +83,33 @@ def get_card(conn, card_id):
     return row
 
 
+def get_cached_set_cards(conn, set_id):
+    """
+    Cartas de un set ya cacheadas vía set_cards_cache (JOIN a cards).
+    Lista vacía = cache-miss, el caller debe pedirle a la API externa.
+    Orden numérico por 'number' (CAST a entero) porque esa columna es
+    TEXT y un ORDER BY de texto pondría '10' antes que '2'.
+    """
+    query = """
+        SELECT c.id, c.name, c.set_id, c.set_name, c.number, c.rarity, c.image_url
+        FROM set_cards_cache scc
+        JOIN cards c ON c.id = scc.card_id
+        WHERE scc.set_id = ?
+        ORDER BY CAST(c.number AS INTEGER), c.number
+    """
+    return conn.execute(query, (set_id,)).fetchall()
+
+
+def mark_set_card_cached(conn, set_id, card_id):
+    """Registra que esta carta forma parte del resultado cacheado de este set."""
+    query = """
+        INSERT OR REPLACE INTO set_cards_cache (set_id, card_id)
+        VALUES (?, ?)
+    """
+    conn.execute(query, (set_id, card_id))
+    conn.commit()
+
+
 # ------------------------------------------------------------
 # price_snapshots
 # ------------------------------------------------------------
