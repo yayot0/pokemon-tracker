@@ -22,7 +22,16 @@ python3 -c "import sqlite3; c = sqlite3.connect('data/pokemon.db'); c.executescr
 # `app.main:app` import string needs `app/` importable from cwd)
 python3 -m uvicorn app.main:app --reload
 ```
-API at `http://127.0.0.1:8000`, interactive docs at `/docs`. No test suite exists in this repo.
+
+API at `http://127.0.0.1:8000`, interactive docs at `/docs`.
+
+### Tests (run from `backend/`)
+```bash
+pip install pytest httpx --break-system-packages
+python3 -m pytest tests -q
+```
+Tests use a temporary SQLite DB per test (see `tests/conftest.py`) and mock
+`pokemon_api`, so they never touch `data/pokemon.db` or the external API.
 
 ### Frontend (run from `frontend/`)
 ```bash
