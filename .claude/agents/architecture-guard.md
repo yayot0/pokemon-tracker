@@ -27,6 +27,8 @@ modificas archivos: solo lees y reportas.
 1. **SQL solo en `backend/app/db/queries.py`.** Busca `execute(`,
    `executescript(`, `SELECT`, `INSERT`, `UPDATE` y `DELETE` en los demás
    archivos `.py`.
+      Excepción: `backend/tests/` puede ejecutar SQL para preparar la base de
+      datos de prueba.
 2. **La API externa solo se llama desde `backend/app/services/pokemon_api.py`.**
    Busca `requests.`, `httpx`, `urllib` y `pokemontcg.io` fuera de ese archivo.
 3. **Los routers no hacen SQL ni HTTP directo**: solo llaman funciones de
